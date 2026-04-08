@@ -21,7 +21,7 @@ pipeline {
         stage('Git: Code Checkout') {
             steps {
                 script{
-                    code_checkout("https://github.com/himanshugohil18/Wanderlust-Mega-Project.git","main")
+                    code_checkout("https://github.com/Joebaho/DevSecOps-Full-Project.git","main")
                 }
             }
         }
@@ -70,7 +70,7 @@ pipeline {
                         git commit -m "Updated environment variables"
                         
                         echo "Pushing changes to github: "
-                        git push https://github.com/himanshugohil18/Wanderlust-Mega-Project.git
+                        git push https://github.com/Joebaho/DevSecOps-Full-Project.git
                     '''
                     }
                 }
@@ -81,7 +81,7 @@ pipeline {
         success {
             script {
                 emailext attachLog: true,
-                from: 'himanshugohil828@gmail.com',
+                from: 'joebachou@gmail.com',
                 subject: "Wanderlust Application has been updated and deployed - '${currentBuild.result}'",
                 body: """
                     <html>
@@ -98,14 +98,14 @@ pipeline {
                     </body>
                     </html>
             """,
-            to: 'himanshugohil828@gmail.com',
+            to: 'joebachou@gmail.com',
             mimeType: 'text/html'
             }
         }
       failure {
             script {
                 emailext attachLog: true,
-                from: 'himanshugohil828@gmail.com',
+                from: 'joebachou@gmail.com',
                 subject: "Wanderlust Application build failed - '${currentBuild.result}'",
                 body: """
                     <html>
@@ -119,7 +119,7 @@ pipeline {
                     </body>
                     </html>
             """,
-            to: 'himanshugohil828@gmail.com',
+            to: 'joebachou@gmail.com',
             mimeType: 'text/html'
             }
         }
