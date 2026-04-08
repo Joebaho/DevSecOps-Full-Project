@@ -57,7 +57,7 @@ WanderLust is a simple MERN travel blog website ✈ This project is aimed to hel
 #
 
 > [!Note]
-> This project will be implemented on North California region (us-west-1).
+> This project will be implemented in the Oregon region (us-west-2).
 
 - <b>Create 1 Master machine on AWS with 2CPU, 8GB of RAM (t2.large) and 29 GB of storage and install Docker on it.</b>
 #
@@ -123,21 +123,21 @@ sudo apt-get install jenkins -y
   - <b>Create EKS Cluster (Master machine)</b>
   ```bash
   eksctl create cluster --name=wanderlust \
-                      --region=us-east-2 \
+                      --region=us-west-2 \
                       --version=1.30 \
                       --without-nodegroup
   ```
   - <b>Associate IAM OIDC Provider (Master machine)</b>
   ```bash
   eksctl utils associate-iam-oidc-provider \
-    --region us-east-2 \
+    --region us-west-2 \
     --cluster wanderlust \
     --approve
   ```
   - <b>Create Nodegroup (Master machine)</b>
   ```bash
   eksctl create nodegroup --cluster=wanderlust \
-                       --region=us-east-2 \
+                       --region=us-west-2 \
                        --name=wanderlust \
                        --node-type=t2.large \
                        --nodes=2 \
@@ -382,10 +382,10 @@ chmod 777 /var/run/docker.sock
   ![image](https://github.com/user-attachments/assets/4cab99aa-cef3-45f6-9150-05004c2f09f8)
   - <b>Add your cluster to argocd</b>
   ```bash
-  argocd cluster add Wanderlust@wanderlust.us-west-1.eksctl.io --name wanderlust-eks-cluster
+  argocd cluster add Wanderlust@wanderlust.us-west-2.eksctl.io --name wanderlust-eks-cluster
   ```
   > [!Tip]
-  > Wanderlust@wanderlust.us-west-1.eksctl.io --> This should be your EKS Cluster Name.
+  > Wanderlust@wanderlust.us-west-2.eksctl.io --> This should be your EKS Cluster Name.
 
   ![image](https://github.com/user-attachments/assets/0f36aafd-bab9-4ef8-ba5d-3eb56d850604)
   - <b> Once your cluster is added to argocd, go to argocd console <mark>Settings --> Clusters</mark> and verify it</b>
@@ -522,7 +522,7 @@ kubectl get secret --namespace prometheus stable-grafana -o jsonpath="{.data.adm
 ## Clean Up
 - <b id="Clean">Delete eks cluster</b>
 ```bash
-eksctl delete cluster --name=wanderlust --region=us-west-1
+eksctl delete cluster --name=wanderlust --region=us-west-2
 ```
 
 #
