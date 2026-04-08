@@ -4,7 +4,7 @@ data "aws_ami" "ubuntu" {
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
 
   filter {
@@ -13,37 +13,33 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-resource "aws_key_pair" "deployer" {
-  key_name   = "deployer_keypair"
-  public_key = file("/Users/josephmbatchou/Documents/DevSecOps-Full-Project/deployer_keypair.pub")
-}
-
 resource "aws_default_vpc" "default" {
 
 }
 
 resource "aws_security_group" "allow_user_to_connect" {
-  name        = "allow TLS"
-  description = "Allow user to connect"
+  name        = "devsecops-full-project-sg"
+  description = "Allow access to project services"
   vpc_id      = aws_default_vpc.default.id
+
   ingress {
-    description = "port 22 allow"
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress {
-    description = " allow all outgoing traffic "
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+  ingress {
+    description = "SMTP"
+    from_port   = 25
+    to_port     = 25
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
-    description = "port 80 allow"
+    description = "HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
@@ -51,28 +47,96 @@ resource "aws_security_group" "allow_user_to_connect" {
   }
 
   ingress {
-    description = "port 443 allow"
+    description = "HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "SMTPS"
+    from_port   = 465
+    to_port     = 465
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Redis"
+    from_port   = 6379
+    to_port     = 6379
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Kubernetes API server"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Custom application ports"
+    from_port   = 3000
+    to_port     = 10000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Kubernetes NodePort range"
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
-    Name = "mysecurity"
+    Name = "devsecops-full-project-sg"
   }
 }
 
-resource "aws_instance" "testinstance" {
-  ami             = data.aws_ami.ubuntu.id
-  instance_type   = var.instance_type
-  key_name        = aws_key_pair.deployer.key_name
-  security_groups = [aws_security_group.allow_user_to_connect.name]
+resource "aws_instance" "master_machine" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  key_name               = var.key_pair_name
+  vpc_security_group_ids = [aws_security_group.allow_user_to_connect.id]
+  user_data              = file("${path.module}/scripts/master-bootstrap.sh")
+
   tags = {
-    Name = "Automate"
+    Name = "Master Machine"
   }
+
   root_block_device {
-    volume_size = 30 
+    volume_size = var.root_volume_size
+    volume_type = "gp3"
+  }
+}
+
+resource "aws_instance" "jenkins_worker_node" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  key_name               = var.key_pair_name
+  vpc_security_group_ids = [aws_security_group.allow_user_to_connect.id]
+  user_data              = file("${path.module}/scripts/worker-bootstrap.sh")
+
+  tags = {
+    Name = "Jenkins worker node"
+  }
+
+  root_block_device {
+    volume_size = var.root_volume_size
     volume_type = "gp3"
   }
 }
