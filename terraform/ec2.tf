@@ -107,6 +107,36 @@ resource "aws_security_group" "allow_user_to_connect" {
   }
 }
 
+data "aws_iam_policy_document" "jenkins_worker_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "jenkins_worker_role" {
+  name               = "jenkins-worker-node-role"
+  assume_role_policy = data.aws_iam_policy_document.jenkins_worker_assume_role.json
+
+  tags = {
+    Name = "jenkins-worker-node-role"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "jenkins_worker_admin_access" {
+  role       = aws_iam_role.jenkins_worker_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+}
+
+resource "aws_iam_instance_profile" "jenkins_worker_profile" {
+  name = "jenkins-worker-node-profile"
+  role = aws_iam_role.jenkins_worker_role.name
+}
+
 resource "aws_instance" "master_machine" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
@@ -129,6 +159,7 @@ resource "aws_instance" "jenkins_worker_node" {
   instance_type          = var.instance_type
   key_name               = var.key_pair_name
   vpc_security_group_ids = [aws_security_group.allow_user_to_connect.id]
+  iam_instance_profile   = aws_iam_instance_profile.jenkins_worker_profile.name
   user_data              = file("${path.module}/scripts/worker-bootstrap.sh")
 
   tags = {

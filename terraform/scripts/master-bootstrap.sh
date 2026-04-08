@@ -27,6 +27,14 @@ retry() {
 apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl fontconfig gnupg lsb-release software-properties-common unzip wget openjdk-21-jre
 
+# AWS CLI
+if ! command -v aws >/dev/null 2>&1; then
+  retry curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "/tmp/awscliv2.zip"
+  rm -rf /tmp/aws
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install --update
+fi
+
 # Docker
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -81,4 +89,5 @@ fi
 kubectl version --client
 eksctl version
 argocd version --client
+aws --version
 docker ps --filter "name=sonarqube"
