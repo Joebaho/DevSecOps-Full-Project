@@ -1,10 +1,31 @@
 #!/bin/bash
 set -euxo pipefail
 
+if [ "${EUID}" -ne 0 ]; then
+  echo "Please run this script as root or with sudo."
+  exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 
+retry() {
+  local attempts=5
+  local wait_seconds=5
+  local count=1
+
+  until "$@"; do
+    if [ "${count}" -ge "${attempts}" ]; then
+      echo "Command failed after ${attempts} attempts: $*"
+      return 1
+    fi
+
+    count=$((count + 1))
+    sleep "${wait_seconds}"
+  done
+}
+
 apt-get update -y
-apt-get install -y apt-transport-https ca-certificates curl fontconfig gnupg lsb-release software-properties-common unzip wget openjdk-17-jre
+apt-get install -y apt-transport-https ca-certificates curl fontconfig gnupg lsb-release software-properties-common unzip wget openjdk-21-jre
 
 # Docker
 install -m 0755 -d /etc/apt/keyrings
@@ -20,9 +41,9 @@ systemctl start docker
 usermod -aG docker ubuntu || true
 
 # Jenkins
-curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | tee \
-  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | tee \
+curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key -o /etc/apt/keyrings/jenkins-keyring.asc
+chmod a+r /etc/apt/keyrings/jenkins-keyring.asc
+echo "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/" | tee \
   /etc/apt/sources.list.d/jenkins.list > /dev/null
 apt-get update -y
 apt-get install -y jenkins
@@ -30,18 +51,34 @@ systemctl enable jenkins
 systemctl start jenkins
 
 # kubectl
-curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+if ! command -v kubectl >/dev/null 2>&1; then
+  retry curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+  install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+fi
 
 # eksctl
-curl --silent --location "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-install -o root -g root -m 0755 /tmp/eksctl /usr/local/bin/eksctl
+if ! command -v eksctl >/dev/null 2>&1; then
+  retry curl --silent --location --output /tmp/eksctl.tar.gz "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz"
+  tar xzf /tmp/eksctl.tar.gz -C /tmp
+  install -o root -g root -m 0755 /tmp/eksctl /usr/local/bin/eksctl
+fi
 
 # Argo CD CLI
-curl -fsSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-chmod +x /usr/local/bin/argocd
+if ! command -v argocd >/dev/null 2>&1; then
+  retry curl -fsSL -o /tmp/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+  install -o root -g root -m 0755 /tmp/argocd /usr/local/bin/argocd
+fi
 
 # SonarQube
-docker pull sonarqube:lts-community
-docker rm -f sonarqube || true
-docker run -d --name sonarqube --restart unless-stopped -p 9000:9000 sonarqube:lts-community
+retry docker pull sonarqube:lts-community
+
+if docker ps -a --format '{{.Names}}' | grep -qx sonarqube; then
+  docker start sonarqube || true
+else
+  docker run -d --name sonarqube --restart unless-stopped -p 9000:9000 sonarqube:lts-community
+fi
+
+kubectl version --client
+eksctl version
+argocd version --client
+docker ps --filter "name=sonarqube"
